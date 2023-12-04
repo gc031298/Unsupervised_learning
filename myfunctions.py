@@ -49,15 +49,7 @@ def pca(data, n_components):
         raise Exception('Projecting in a space of higher dimension. Decrease n_components.')
     
     cov = np.dot(data.T, data)
-    eigenvalues = np.linalg.eig(cov)[0]
-    U = np.linalg.eig(cov)[1]
-
-    # # To have the same ouputs as sklearn.PCA:
-    # for i in range(np.shape(U)[0]):
-    #     j = np.argmax(np.abs(U[i,:]))
-    #     if U[i,j] < 0:
-    #         U[:,i] = -U[:,i]
-
+    eigenvalues, U = np.linalg.eig(cov)
     idx = np.argsort(eigenvalues)[::-1]
     new_data = np.dot(data, U[:,idx[0:n_components]])
     return new_data
@@ -239,8 +231,7 @@ def kernel_PCA(data, n_components, choice = 'rbf', sigma = 1, d = 1):
     else:
         K = kernel_matrix(data, 'polynomial', sigma, d)
     K_tilde = kernel_double_centering(K)
-    eigs = np.linalg.eigh(K_tilde)[0]
-    U = np.linalg.eigh(K_tilde)[1]
+    eigs, U = np.linalg.eigh(K_tilde)
 
     for i in range(np.shape(U)[0]):
         j = np.argmax(np.abs(U[i,:]))
@@ -434,14 +425,45 @@ def c_means(data, k, f=2, tolerance=1e-4):
     while True:
         prev_U = U.copy()
         centers = np.dot(U.T**f, data)/np.dot(U.T**f, np.ones((data.shape[0], 1)))
-        #centers = np.dot(U.T**f, data)/np.sum(U ** f, axis=0, keepdims=True).T
         distance = cdist(data, centers, metric='euclidean')
         distance = np.maximum(distance, 1.e-6)  # Avoid division by zero
-        distances_exp = (distance[:, :, None] / distance[:, None, :]) ** exp
-        U = 1 / np.sum(distances_exp, axis=-1)
+        distances_exp = (distance[:, :, None]/distance[:, None, :])**exp
+        U = 1/np.sum(distances_exp, axis=-1)
         if np.linalg.norm(U-prev_U) < tolerance:
             break
 
     labels = np.argmax(U, axis=1)
-    loss = np.sum(U ** f * distance ** 2)
+    loss = np.sum(U**f * distance**2)
+    return labels, loss
+
+
+# Laboratory 9
+
+
+def spectral_clustering(data, n_neigh, k, init = 'def'):
+    """
+    Performs spectral clustering.
+    Input:
+    - data: matrix storing datapoints on rows
+    - n_neigh: number of neighbors for similarity matrix
+    - k: number of output clusters
+    - init: 'def' for standard k-means,
+            'k++' for k-means++. Default: 'def'
+    Output:
+    - labels: k cluster lables
+    - loss: total k-means loss
+    """
+    dist = distance_matrix(data)
+    neighbors = nearest_neighbors(dist, n_neigh)
+    similarity = np.zeros_like(dist)
+    for i in range(np.shape(data)[0]):
+        for idx in neighbors[i,:]:
+            if dist[i, int(idx)] != 0:
+                similarity[i, int(idx)] = similarity[int(idx), i] = 1/dist[i, int(idx)]
+    degree = np.diag(np.array([np.sum([similarity[i,j] for j in range(np.shape(data)[0])]) for i in range(np.shape(data)[0])]))
+    laplacian = degree - similarity
+    lbd, U = np.linalg.eigh(laplacian)
+    idx = np.argsort(lbd)[:k]
+    spectral_data = U[:,idx]
+    labels, loss = k_means(data = spectral_data, k = k, init = init)
     return labels, loss
