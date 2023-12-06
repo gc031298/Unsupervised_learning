@@ -80,18 +80,6 @@ def normalize_data(data):
 # Laboratory 3
 
 
-def distance_matrix(x):
-    """
-    Returns the matrix of distances between datapoints
-    """
-    n = np.shape(x)[0]
-    D = np.zeros((n,n))
-    for i in range(n):
-        for j in range(i+1):
-            D[i,j] = D[j,i] = np.linalg.norm(x[i,:] - x[j,:])
-    return D
-
-
 def nearest_neighbors(D, k):
     """
     Returns the k nearest neighbours of each data point.
@@ -165,7 +153,7 @@ def isomap(data, d, k):
     if (d > m):
         raise Exception('Trying to project in a higher dimensional space. "d" must be smaller than the dimension of the data.')
     
-    D = distance_matrix(data)
+    D = cdist(data, data, metric='euclidean')
     neighbors = nearest_neighbors(D,k)
     G = nn_graph(D, neighbors)
     F = floyd_warshall(G)
@@ -368,7 +356,7 @@ def k_means(data, k, init = 'def'):
         if np.allclose(prev_centroids, centroids):
             break
     
-    loss = np.sum([np.sum([(labels[i] == j)*(np.linalg.norm(data[i,:] - centroids[j,:])**2) for i in range(data.shape[0])]) for j in range(k)])
+    loss = np.sum([np.linalg.norm(data[i] - centroids[labels[i]])**2 for i in range(len(data))])
     return labels, loss
 
 
@@ -407,7 +395,7 @@ def k_medoids(data, k, init = 'def'):
         if np.allclose(prev_medoids, medoids):
             break
     
-    loss = np.sum([np.sum([(labels[i] == j)*(np.linalg.norm(data[i,:] - medoids[j,:])**2) for i in range(data.shape[0])]) for j in range(k)])
+    loss = np.sum([np.linalg.norm(data[i] - medoids[labels[i]])**2 for i in range(len(data))])
     return labels, loss
 
 
@@ -420,20 +408,22 @@ def c_means(data, k, f=2, tolerance=1e-4):
     """
     exp = 2/(f-1)
     U = np.random.rand(data.shape[0], k)
-    U /= np.sum(U, axis=1, keepdims=True)
-
+    U = U/np.sum(U, axis=1, keepdims=True)
+    
     while True:
         prev_U = U.copy()
-        centers = np.dot(U.T**f, data)/np.dot(U.T**f, np.ones((data.shape[0], 1)))
+        weights = U**f
+        centers = np.dot(weights.T, data)/np.dot(weights.T, np.ones((data.shape[0], 1)))
         distance = cdist(data, centers, metric='euclidean')
         distance = np.maximum(distance, 1.e-6)  # Avoid division by zero
-        distances_exp = (distance[:, :, None]/distance[:, None, :])**exp
-        U = 1/np.sum(distances_exp, axis=-1)
+        #distances_exp = (distance[:, :, None]/distance[:, None, :])**exp
+        #U = 1/np.sum(distances_exp, axis=-1)
+        U = 1/np.sum((distance[:, :, None]/distance[:, None, :])**exp, axis = -1)
         if np.linalg.norm(U-prev_U) < tolerance:
             break
 
     labels = np.argmax(U, axis=1)
-    loss = np.sum(U**f * distance**2)
+    loss = np.sum(weights*distance**2)
     return labels, loss
 
 
@@ -453,7 +443,7 @@ def spectral_clustering(data, n_neigh, k, init = 'def'):
     - labels: k cluster lables
     - loss: total k-means loss
     """
-    dist = distance_matrix(data)
+    dist = cdist(data, data, metric='euclidean')
     neighbors = nearest_neighbors(dist, n_neigh)
     similarity = np.zeros_like(dist)
     for i in range(np.shape(data)[0]):
@@ -467,3 +457,27 @@ def spectral_clustering(data, n_neigh, k, init = 'def'):
     spectral_data = U[:,idx]
     labels, loss = k_means(data = spectral_data, k = k, init = init)
     return labels, loss
+
+
+# Laboratory 10
+
+
+def density_peaks(data, k, dc = 1):
+    """
+    Performs density peaks algorithm
+    """
+    n = np.shape(data)[0]
+
+    distance = cdist(data, data, metric='euclidean')
+    density = np.sum(np.exp(-(distance/dc)**2), axis = 1)
+    data = data[np.argsort(density)[::-1]]
+
+    delta = np.zeros(n)
+    for i in range(1,n):
+        delta[i] = np.min(distance[i,:i])
+    delta[0] = 1.05*np.max(delta)
+
+    idx_centers = np.argsort(delta)[::-1][:k]
+    centers = data[idx_centers]
+    dist_centers = cdist(data, centers, metric='euclidean')
+    return np.argmin(dist_centers, axis=1), centers
