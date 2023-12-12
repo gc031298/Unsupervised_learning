@@ -7,6 +7,40 @@ from matplotlib import pyplot as plt
 # Laboratory 1
 
 
+def mixGauss(means, sigmas, n):
+    """
+    Returns two vectors data, labels.
+    - data contains 2*n points from two multivariate gaussians X, Y;
+    - labels contains the labels (X = 0, Y = 1).
+    """
+    means = np.array(means)
+    sigmas = np.array(sigmas)
+    dim = np.shape(means)[1] 
+    num_classes = sigmas.size
+    
+    data = np.full(fill_value= np.inf, shape=(n*num_classes, dim))
+    labels = np.zeros(n*num_classes)
+
+    for i, _ in enumerate(sigmas):
+        data[i*n:(i+1)*n] = np.random.multivariate_normal(mean=means[i], cov = np.eye(dim)*sigmas[i]**2, size=n)
+        labels[i*n:(i+1)*n] = i
+    
+    return data, labels
+
+
+def swap_label(p, labels):
+    """
+    Swaps the labels with probability p.
+    """
+    n = np.shape(labels)[0]
+    noisylabels = np.copy(np.squeeze(labels))
+    n_flips = int(np.floor(n*p))
+    idx_flip = np.random.choice(n, size = n_flips, replace=False)
+    noisylabels[idx_flip] = np.abs(1-noisylabels[idx_flip])
+    
+    return noisylabels
+
+
 def swiss_roll(n):
     """
     Defines the swiss roll dataset
@@ -31,6 +65,20 @@ def swiss_roll_gaussian_noise(n, mu = 0, sigma = 0.5):
     data[:,0]=phi*np.cos(phi) + noise[:,0]
     data[:,1]=phi*np.sin(phi) + noise[:,1]
     data[:,2]=psi
+    return data
+
+
+def klein(n):
+    data = np.zeros((n,3))
+    theta = np.random.uniform(low=0, high=np.pi, size=n)
+    phi = np.random.uniform(low=0, high=2*np.pi, size=n)
+            
+    data[:,0]= -2/15*np.cos(theta)*(3*np.cos(phi)+30*np.sin(theta)+90*np.cos(theta)**4*np.sin(theta)-60*np.cos(theta)**6*np.sin(theta)+5*np.cos(theta)*np.cos(phi)*np.sin(theta))
+    data[:,1]= 1/15*np.sin(theta)*(3*np.cos(phi)+3*np.cos(theta)**2*np.cos(phi)-48*np.cos(theta)**4*np.cos(phi)+48*np.cos(theta)**6*np.cos(phi)-60*np.sin(theta)
+                                   +5*np.cos(theta)*np.cos(phi)*np.sin(theta)-5*np.cos(theta)**3*np.cos(theta)*np.sin(theta)-80*np.cos(theta)**5*np.cos(phi)*np.sin(theta)
+                                   +80*np.cos(theta)**7*np.cos(phi)*np.sin(theta))
+    data[:,2]=2/15*(3+5*np.cos(theta)*np.sin(theta))*np.sin(phi)
+    
     return data
 
 
@@ -457,8 +505,8 @@ def spectral_clustering(data, n_neigh, k, init = 'def'):
     lbd, U = np.linalg.eigh(laplacian)
     idx = np.argsort(lbd)[:k]
     spectral_data = U[:,idx]
-    labels, loss, centers = k_means(data = spectral_data, k = k, init = init)
-    return labels, loss, centers
+    labels, loss, _ = k_means(data = spectral_data, k = k, init = init)
+    return labels, loss
 
 
 # Laboratory 10
@@ -514,3 +562,16 @@ def normalized_mutual_information(x,y):
         return entropy
     
     return 2*mutual_information(x,y)/(entropy(x) + entropy(y))
+
+
+def f_score(data, labels, centers):
+    """
+    Computes the F-score
+    """
+    n = np.shape(data)[0]
+    k = np.shape(centers)[0]
+    ssw = np.sum([np.linalg.norm(data[i] - centers[labels[i]-1])**2 for i in range(n)])
+    _, count = np.unique(labels, return_counts=True)
+    x_mean = np.mean(data, axis = 0)
+    ssb = np.sum([count[j]*np.linalg.norm(centers[j] - x_mean)**2 for j in range(k)])
+    return k*ssb/ssw
