@@ -462,22 +462,39 @@ def spectral_clustering(data, n_neigh, k, init = 'def'):
 # Laboratory 10
 
 
-def density_peaks(data, k, dc = 1):
+def density_peaks(data, k, dc):
     """
-    Performs density peaks algorithm
+    Performs density peaks clustering.
+    Args:
+    - data: NxM matrix of data
+    - k: number of clusters
+    - dc: cutoff distance
     """
     n = np.shape(data)[0]
-
-    distance = cdist(data, data, metric='euclidean')
+    distance = cdist(data, data, metric = 'euclidean')
     density = np.sum(np.exp(-(distance/dc)**2), axis = 1)
-    data = data[np.argsort(density)[::-1]]
-
+    idx_sorted = np.argsort(-density)
+    
     delta = np.zeros(n)
+    idx_neighbor = np.zeros(n, dtype=int)
     for i in range(1,n):
-        delta[i] = np.min(distance[i,:i])
-    delta[0] = 1.05*np.max(delta)
-
-    idx_centers = np.argsort(delta)[::-1][:k]
-    centers = data[idx_centers]
-    dist_centers = cdist(data, centers, metric='euclidean')
-    return np.argmin(dist_centers, axis=1), centers
+        delta[idx_sorted[i]] = np.min(distance[idx_sorted[i],idx_sorted[:i]])
+        idx_neighbor[idx_sorted[i]] = idx_sorted[np.argmin(distance[idx_sorted[i],idx_sorted[:i]])]
+    delta[idx_sorted[0]] = 1.05*np.max(delta)
+    idx_centers = np.argsort(-delta)[:k]
+    
+    ind = [idx_sorted[i] for i in range(n)]
+    labels = np.zeros(n, dtype = int)
+    for j in range(k):
+        labels[idx_centers[j]] = j+1
+        ind.remove(idx_centers[j])
+    
+    cond = True
+    while cond:
+        for i in ind:
+            if labels[idx_neighbor[i]] != 0:
+                labels[i] = labels[idx_neighbor[i]]
+                ind.remove(i)
+        cond = len(ind) > 0
+    
+    return labels, idx_centers
