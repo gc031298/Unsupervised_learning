@@ -333,6 +333,7 @@ def k_means(data, k, init = 'def'):
     Returns:
     - cluster labels
     - total loss
+    - centroids
     """
     if init == 'def':
         centroids = data[np.random.choice(data.shape[0], k, replace=False)]
@@ -357,7 +358,7 @@ def k_means(data, k, init = 'def'):
             break
     
     loss = np.sum([np.linalg.norm(data[i] - centroids[labels[i]])**2 for i in range(len(data))])
-    return labels, loss
+    return labels, loss, centroids
 
 
 # Laboratory 8
@@ -372,6 +373,7 @@ def k_medoids(data, k, init = 'def'):
     Returns:
     - cluster labels
     - total loss
+    - medoids
     """
     if init == 'def':
         medoids = data[np.random.choice(data.shape[0], k, replace=False)]
@@ -396,7 +398,7 @@ def k_medoids(data, k, init = 'def'):
             break
     
     loss = np.sum([np.linalg.norm(data[i] - medoids[labels[i]])**2 for i in range(len(data))])
-    return labels, loss
+    return labels, loss, medoids
 
 
 def c_means(data, k, f=2, tolerance=1e-4):
@@ -405,6 +407,7 @@ def c_means(data, k, f=2, tolerance=1e-4):
     Returns:
     - cluster labels
     - total loss
+    - centers
     """
     exp = 2/(f-1)
     U = np.random.rand(data.shape[0], k)
@@ -415,16 +418,14 @@ def c_means(data, k, f=2, tolerance=1e-4):
         weights = U**f
         centers = np.dot(weights.T, data)/np.dot(weights.T, np.ones((data.shape[0], 1)))
         distance = cdist(data, centers, metric='euclidean')
-        distance = np.maximum(distance, 1.e-6)  # Avoid division by zero
-        #distances_exp = (distance[:, :, None]/distance[:, None, :])**exp
-        #U = 1/np.sum(distances_exp, axis=-1)
+        distance = np.maximum(distance, 1.e-6) # avoid division by 0
         U = 1/np.sum((distance[:, :, None]/distance[:, None, :])**exp, axis = -1)
         if np.linalg.norm(U-prev_U) < tolerance:
             break
 
     labels = np.argmax(U, axis=1)
     loss = np.sum(weights*distance**2)
-    return labels, loss
+    return labels, loss, centers
 
 
 # Laboratory 9
@@ -442,6 +443,7 @@ def spectral_clustering(data, n_neigh, k, init = 'def'):
     Output:
     - labels: k cluster lables
     - loss: total k-means loss
+    - centers
     """
     dist = cdist(data, data, metric='euclidean')
     neighbors = nearest_neighbors(dist, n_neigh)
@@ -455,8 +457,8 @@ def spectral_clustering(data, n_neigh, k, init = 'def'):
     lbd, U = np.linalg.eigh(laplacian)
     idx = np.argsort(lbd)[:k]
     spectral_data = U[:,idx]
-    labels, loss = k_means(data = spectral_data, k = k, init = init)
-    return labels, loss
+    labels, loss, centers = k_means(data = spectral_data, k = k, init = init)
+    return labels, loss, centers
 
 
 # Laboratory 10
@@ -497,4 +499,18 @@ def density_peaks(data, k, dc):
                 ind.remove(i)
         cond = len(ind) > 0
     
-    return labels, idx_centers
+    return labels, data[idx_centers]
+
+
+def normalized_mutual_information(x,y):
+    """
+    Computes normalized mutual information
+    """
+    def entropy(x):
+        
+        values, count = np.unique(x, return_counts=True)
+        prob = [(count[i]/len(x)) for i in range(len(values))]
+        entropy = -np.sum([prob[j]*np.log(prob[j]) for j in range(len(values))])
+        return entropy
+    
+    return 2*mutual_information(x,y)/(entropy(x) + entropy(y))
