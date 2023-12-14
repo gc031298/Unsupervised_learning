@@ -4,41 +4,8 @@ from sklearn.linear_model import LinearRegression as LR
 from scipy.spatial.distance import cdist
 from matplotlib import pyplot as plt
 
+
 # Laboratory 1
-
-
-def mixGauss(means, sigmas, n):
-    """
-    Returns two vectors data, labels.
-    - data contains 2*n points from two multivariate gaussians X, Y;
-    - labels contains the labels (X = 0, Y = 1).
-    """
-    means = np.array(means)
-    sigmas = np.array(sigmas)
-    dim = np.shape(means)[1] 
-    num_classes = sigmas.size
-    
-    data = np.full(fill_value= np.inf, shape=(n*num_classes, dim))
-    labels = np.zeros(n*num_classes)
-
-    for i, _ in enumerate(sigmas):
-        data[i*n:(i+1)*n] = np.random.multivariate_normal(mean=means[i], cov = np.eye(dim)*sigmas[i]**2, size=n)
-        labels[i*n:(i+1)*n] = i
-    
-    return data, labels
-
-
-def swap_label(p, labels):
-    """
-    Swaps the labels with probability p.
-    """
-    n = np.shape(labels)[0]
-    noisylabels = np.copy(np.squeeze(labels))
-    n_flips = int(np.floor(n*p))
-    idx_flip = np.random.choice(n, size = n_flips, replace=False)
-    noisylabels[idx_flip] = np.abs(1-noisylabels[idx_flip])
-    
-    return noisylabels
 
 
 def swiss_roll(n):
@@ -68,20 +35,6 @@ def swiss_roll_gaussian_noise(n, mu = 0, sigma = 0.5):
     return data
 
 
-def klein(n):
-    data = np.zeros((n,3))
-    theta = np.random.uniform(low=0, high=np.pi, size=n)
-    phi = np.random.uniform(low=0, high=2*np.pi, size=n)
-            
-    data[:,0]= -2/15*np.cos(theta)*(3*np.cos(phi)+30*np.sin(theta)+90*np.cos(theta)**4*np.sin(theta)-60*np.cos(theta)**6*np.sin(theta)+5*np.cos(theta)*np.cos(phi)*np.sin(theta))
-    data[:,1]= 1/15*np.sin(theta)*(3*np.cos(phi)+3*np.cos(theta)**2*np.cos(phi)-48*np.cos(theta)**4*np.cos(phi)+48*np.cos(theta)**6*np.cos(phi)-60*np.sin(theta)
-                                   +5*np.cos(theta)*np.cos(phi)*np.sin(theta)-5*np.cos(theta)**3*np.cos(theta)*np.sin(theta)-80*np.cos(theta)**5*np.cos(phi)*np.sin(theta)
-                                   +80*np.cos(theta)**7*np.cos(phi)*np.sin(theta))
-    data[:,2]=2/15*(3+5*np.cos(theta)*np.sin(theta))*np.sin(phi)
-    
-    return data
-
-
 # Laboratory 2
 
 
@@ -89,14 +42,15 @@ def pca(data, n_components):
     """
     Performs PCA on a data set
     Input:
-    - centered data
+    - data
     - dimension of projection space
     Output: projected data as a np_array
     """
     if (n_components > np.shape(data)[0]):
         raise Exception('Projecting in a space of higher dimension. Decrease n_components.')
     
-    cov = np.dot(data.T, data)
+    data = data - np.mean(data, axis = 0)
+    cov = np.dot(data.T, data)/np.shape(data)[0]
     eigenvalues, U = np.linalg.eig(cov)
     idx = np.argsort(eigenvalues)[::-1]
     new_data = np.dot(data, U[:,idx[0:n_components]])
@@ -107,49 +61,34 @@ def center_data(data):
     """
     Centers the data
     """
-    data = np.array(data)
-    n = np.shape(data)[1]
-    for i in range(n):
-        data[:,i] = data[:,i] - np.ones(np.shape(data)[0])*np.mean(data[:,i])
-    return data
+    return data - np.mean(data, axis = 0)
 
 
 def normalize_data(data):
     """
     Normalizes the data
     """
-    data = np.array(data)
-    n = np.shape(data)[1]
-    for i in range(n):
-        data[:,i] = (data[:,i] - np.ones(np.shape(data)[0])*np.mean(data[:,i]))/np.std(data[:,i])
-    return data
+    return (data - np.mean(data, axis = 0))/np.std(data, axis = 0)
 
 
 # Laboratory 3
 
 
-def nearest_neighbors(D, k):
+def nearest_neighbors(data, k):
     """
     Returns the k nearest neighbours of each data point.
     Output size: (n,k)
     """
-    n = np.shape(D)[0]
-    neighbors = np.zeros((n,k))
-    for i in range(n):
-        neighbors[i,:] = np.argsort(D[i,:])[1:k+1]
-    return neighbors
+    distance = cdist(data, data, metric = 'euclidean')
+    return np.array([np.argsort(distance[i,:]) for i in range(np.shape(data)[0])]).astype(int)[:,1:k+1]
 
 
-def nn_graph(D, neighbors):
+def nn_graph(data, neighbors):
     """
     Returns the graph connecting the k nearest neighbors
     """
-    n = np.shape(D)[0]
-    graph = np.ones_like(D) * np.inf
-    for i in range(n):
-        graph[i,i] = 0
-        for idx in neighbors[i,:]:
-            graph[i,int(idx)] = D[i,int(idx)]
+    distance = cdist(data, data, metric = 'euclidean')
+    graph = np.array([[0 if i == j else distance[i,j] if j in neighbors[i,:] else np.inf for j in range(np.shape(data)[0])] for i in range(np.shape(data)[0])])
     return graph
 
 
@@ -167,25 +106,13 @@ def floyd_warshall(graph):
     return graph
 
 
-def pow2_matrix(D):
-    """
-    Returns a new matrix with all components squared
-    """
-    n, m = np.shape(D)
-    squared_D = np.zeros((n, m))
-    for i in range(n):
-        for j in range(m):
-            squared_D[i,j] = D[i,j] ** 2
-    return squared_D
-
-
 def isomap_double_centering(D):
     """
     Performs double centering of a matrix D
     """
     n = np.shape(D)[0]
     C = np.eye(n) - np.ones((n,n))/n
-    D2 = pow2_matrix(D)
+    D2 = D**2
     return -0.5*np.dot(C, np.dot(D2, C))
 
 
@@ -200,10 +127,9 @@ def isomap(data, d, k):
     m = np.shape(data)[1]
     if (d > m):
         raise Exception('Trying to project in a higher dimensional space. "d" must be smaller than the dimension of the data.')
-    
-    D = cdist(data, data, metric='euclidean')
-    neighbors = nearest_neighbors(D,k)
-    G = nn_graph(D, neighbors)
+
+    neighbors = nearest_neighbors(data,k)
+    G = nn_graph(data, neighbors)
     F = floyd_warshall(G)
     F_centered = isomap_double_centering(F)
 
@@ -215,22 +141,6 @@ def isomap(data, d, k):
 
 # Laboratory 4
 
-
-def rbf_kernel(x1, x2, sigma):
-    """
-    Returns the computation of the Gaussian kernel between x1 and x2.
-    """
-    gamma = sigma**(-2)
-    return np.exp(-gamma*np.linalg.norm(x1-x2)**2)
-
-
-def polynomial_kernel(x1, x2, d):
-    """
-    Returns the compuation of the polynomial kernel of degree d between x1 and x2.
-    """
-    return (1 + np.dot(x1.T, x2))**d
-
-
 def kernel_matrix(data, choice = 'rbf', sigma = 1, d = 0):
     """
     Computes the kernel matrix using either the rbf or the polynomial kernel.
@@ -239,9 +149,9 @@ def kernel_matrix(data, choice = 'rbf', sigma = 1, d = 0):
     n = np.shape(data)[0]
     K = np.zeros((n,n))
     if choice == 'rbf':
-        K = [[(rbf_kernel(data[i,:], data[j,:], sigma = sigma)) for j in range(n)] for i in range(n)]
+        K = np.exp(-sigma**(-2)*cdist(data, data, metric = 'euclidean')**2)
     else:
-        K = [[(polynomial_kernel(data[i,:], data[j,:], d = d)) for j in range(n)] for i in range(n)]
+        K = (np.ones((n,n)) + np.dot(data, data.T))**d
     return K
 
 
@@ -250,8 +160,8 @@ def kernel_double_centering(K):
     Performs double centering of matrix A.
     """
     n = np.shape(K)[0]
-    I = np.ones((n,n))/n
-    return K - np.dot(I,K) - np.dot(K,I) + np.dot(I, np.dot(K,I))
+    I = np.ones((n,n))
+    return K - np.dot(I,K)/n - np.dot(K,I)/n + np.dot(I, np.dot(K,I))/(n*n)
 
 
 def kernel_PCA(data, n_components, choice = 'rbf', sigma = 1, d = 1):
