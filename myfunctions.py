@@ -50,7 +50,7 @@ def pca(data, n_components):
         raise Exception('Projecting in a space of higher dimension. Decrease n_components.')
     
     data = data - np.mean(data, axis = 0)
-    cov = np.dot(data.T, data)/np.shape(data)[0]
+    cov = np.cov(data.T)
     eigenvalues, U = np.linalg.eig(cov)
     idx = np.argsort(eigenvalues)[::-1]
     new_data = np.dot(data, U[:,idx[0:n_components]])
@@ -178,12 +178,6 @@ def kernel_PCA(data, n_components, choice = 'rbf', sigma = 1, d = 1):
         K = kernel_matrix(data, 'polynomial', sigma, d)
     K_tilde = kernel_double_centering(K)
     eigs, U = np.linalg.eigh(K_tilde)
-
-    for i in range(np.shape(U)[0]):
-        j = np.argmax(np.abs(U[i,:]))
-        if U[i,j] < 0:
-            U[:,i] = -U[:,i]
-
     idx = np.argsort(eigs)[::-1]
     return np.dot(U[:, idx[0:n_components]], np.diag(np.sqrt(eigs[idx[0:n_components]])))
 
