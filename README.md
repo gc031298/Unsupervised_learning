@@ -27,5 +27,6 @@ Manifold sculpting is a manifold learning technique which iteratively reduces di
 - [notebook](project/project.ipynb)
 - [utilities](project/utils.py)
 - [isomap](project/isomap.py)
+- [presentation](project/ManifoldSculpting.pptx)
 
 ![manifold sculpting](project/images/swiss_roll.gif)
