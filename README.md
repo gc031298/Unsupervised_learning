@@ -29,4 +29,4 @@ tension in local neighborhoods. We qualitatively compare this method with other 
 - [utilities](project/utils.py)
 - [isomap](project/isomap.py)
 
-[manifold sculpting](project/images/swiss_roll.gif)
+![manifold sculpting](project/images/swiss_roll.gif)
